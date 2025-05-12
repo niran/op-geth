@@ -32,8 +32,18 @@ import (
 	"github.com/ethereum/go-ethereum/core/stateless"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+)
+
+var (
+	// Track the time spent for building each payload. One payload only has one building timer.
+	payloadBuildingTimer = metrics.NewRegisteredResettingTimer("miner/payload/building", nil)
+	// Track the time spent for each update pass of payload building. One payload can have multiple update passes.
+	payloadUpdateTimer = metrics.NewRegisteredResettingTimer("miner/payload/update", nil)
+	// Track the idle time between update passes. One payload only has one idle timer.
+	payloadIdleTimer = metrics.NewRegisteredResettingTimer("miner/payload/idle", nil)
 )
 
 // BuildPayloadArgs contains the provided parameters for building payload.
@@ -391,7 +401,15 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 			return dur
 		}
 
-		var lastDuration time.Duration
+		var lastDuration, idleAccumulator time.Duration
+		idleStart := time.Now()
+
+		defer func() {
+			idleAccumulator += time.Since(idleStart)
+			payloadIdleTimer.Update(idleAccumulator)
+			payloadBuildingTimer.UpdateSince(start)
+		}()
+
 		for {
 			select {
 			case <-miner.lifeCtx.Done():
@@ -410,7 +428,10 @@ func (miner *Miner) buildPayload(args *BuildPayloadArgs, witness bool) (*Payload
 					stopReason = "near-timeout"
 					return
 				}
+				idleAccumulator += time.Since(idleStart)
 				lastDuration = updatePayload()
+				payloadUpdateTimer.Update(lastDuration)
+				idleStart = time.Now()
 			case <-payload.stop:
 				return
 			case <-endTimer.C:
