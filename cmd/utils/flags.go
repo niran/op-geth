@@ -934,12 +934,6 @@ var (
 		Value:    ethconfig.Defaults.GPO.IgnorePrice.Int64(),
 		Category: flags.GasPriceCategory,
 	}
-	GpoMinSuggestedPriorityFeeFlag = &cli.Int64Flag{
-		Name:     "gpo.minsuggestedpriorityfee",
-		Usage:    "Minimum transaction priority fee to suggest. Used on OP chains when blocks are not full.",
-		Value:    ethconfig.Defaults.GPO.MinSuggestedPriorityFee.Int64(),
-		Category: flags.GasPriceCategory,
-	}
 
 	// Rollup Flags
 	RollupSequencerHTTPFlag = &cli.StringFlag{
@@ -1616,9 +1610,6 @@ func setGPO(ctx *cli.Context, cfg *gasprice.Config) {
 	}
 	if ctx.IsSet(GpoIgnoreGasPriceFlag.Name) {
 		cfg.IgnorePrice = big.NewInt(ctx.Int64(GpoIgnoreGasPriceFlag.Name))
-	}
-	if ctx.IsSet(GpoMinSuggestedPriorityFeeFlag.Name) {
-		cfg.MinSuggestedPriorityFee = big.NewInt(ctx.Int64(GpoMinSuggestedPriorityFeeFlag.Name))
 	}
 }
 
