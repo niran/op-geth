@@ -158,6 +158,7 @@ type Config struct {
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
 
 	EffectiveGasCeil uint64 // OP-Stack: if non-zero, a gas ceiling to enforce independent of the header's gaslimit value
+	MaxTxGasLimit    uint64 // Maximum gas limit allowed per individual transaction
 }
 
 // DefaultConfig contains the default configurations for the transaction pool.
@@ -174,6 +175,8 @@ var DefaultConfig = Config{
 	GlobalQueue:  1024,
 
 	Lifetime: 3 * time.Hour,
+
+	MaxTxGasLimit: 0, // 0 means no limit (default behavior)
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -637,6 +640,7 @@ func (pool *LegacyPool) ValidateTxBasics(tx *types.Transaction) error {
 		MaxSize:          txMaxSize,
 		MinTip:           pool.gasTip.Load().ToBig(),
 		EffectiveGasCeil: pool.config.EffectiveGasCeil,
+		MaxTxGasLimit:    pool.config.MaxTxGasLimit,
 	}
 	return txpool.ValidateTransaction(tx, pool.currentHead.Load(), pool.signer, opts)
 }
