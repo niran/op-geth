@@ -63,6 +63,8 @@ type BlockContext struct {
 	L1CostFunc types.L1CostFunc
 	// OperatorCostFunc returns the operator cost. The function may be nil
 	OperatorCostFunc types.OperatorCostFunc
+	// FloorDataGasFunc returns configurable EIP-7623 floor data gas. The function may be nil
+	FloorDataGasFunc types.FloorDataGasFunc
 
 	// Block information
 	Coinbase    common.Address // Provides information for COINBASE

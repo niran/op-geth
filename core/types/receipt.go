@@ -92,8 +92,10 @@ type Receipt struct {
 	FeeScalar           *big.Float `json:"l1FeeScalar,omitempty"`         // Present from pre-bedrock to Ecotone. Nil after Ecotone
 	L1BaseFeeScalar     *uint64    `json:"l1BaseFeeScalar,omitempty"`     // Always nil prior to the Ecotone hardfork
 	L1BlobBaseFeeScalar *uint64    `json:"l1BlobBaseFeeScalar,omitempty"` // Always nil prior to the Ecotone hardfork
-	OperatorFeeScalar   *uint64    `json:"operatorFeeScalar,omitempty"`   // Always nil prior to the Isthmus hardfork
-	OperatorFeeConstant *uint64    `json:"operatorFeeConstant,omitempty"` // Always nil prior to the Isthmus hardfork
+	OperatorFeeScalar             *uint64 `json:"operatorFeeScalar,omitempty"`             // Always nil prior to the Isthmus hardfork
+	OperatorFeeConstant           *uint64 `json:"operatorFeeConstant,omitempty"`           // Always nil prior to the Isthmus hardfork
+	Eip7623StandardTokenCost      *uint64 `json:"eip7623StandardTokenCost,omitempty"`      // Always nil prior to the Jovian hardfork
+	Eip7623TotalCostFloorPerToken *uint64 `json:"eip7623TotalCostFloorPerToken,omitempty"` // Always nil prior to the Jovian hardfork
 }
 
 type receiptMarshaling struct {
@@ -598,12 +600,24 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 				rs[i].OperatorFeeScalar = u32ptrTou64ptr(gasParams.operatorFeeScalar)
 				rs[i].OperatorFeeConstant = gasParams.operatorFeeConstant
 			}
+			if gasParams.eip7623StandardTokenCost != nil && gasParams.eip7623TotalCostFloorPerToken != nil {
+				rs[i].Eip7623StandardTokenCost = u8ptrTou64ptr(gasParams.eip7623StandardTokenCost)
+				rs[i].Eip7623TotalCostFloorPerToken = u32ptrTou64ptr(gasParams.eip7623TotalCostFloorPerToken)
+			}
 		}
 	}
 	return nil
 }
 
 func u32ptrTou64ptr(a *uint32) *uint64 {
+	if a == nil {
+		return nil
+	}
+	b := uint64(*a)
+	return &b
+}
+
+func u8ptrTou64ptr(a *uint8) *uint64 {
 	if a == nil {
 		return nil
 	}

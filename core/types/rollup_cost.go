@@ -20,12 +20,20 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"math/big"
+
+	"errors"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
+)
+
+var (
+	// ErrGasUintOverflow is returned when calculating gas usage results in overflow.
+	ErrGasUintOverflow = errors.New("gas uint64 overflow")
 )
 
 const (
@@ -76,6 +84,8 @@ var (
 	// OperatorFeeParamsSlot stores the operatorFeeScalar and operatorFeeConstant L1 gas
 	// attributes
 	OperatorFeeParamsSlot = common.BigToHash(big.NewInt(8))
+	// CalldataGasCostParamsSlot stores the EIP-7623 configurable calldata gas cost parameters
+	CalldataGasCostParamsSlot = common.BigToHash(big.NewInt(9))
 
 	oneMillion     = big.NewInt(1_000_000)
 	ecotoneDivisor = big.NewInt(1_000_000 * 16)
@@ -239,6 +249,80 @@ func NewOperatorCostFunc(config *params.ChainConfig, statedb StateGetter) Operat
 	}
 }
 
+// FloorDataGasFunc is used to compute configurable EIP-7623 floor data gas with custom parameters.
+type FloorDataGasFunc func(data []byte, blockTime uint64) (uint64, error)
+
+// NewFloorDataGasFunc returns a function used for calculating configurable EIP-7623 floor data gas,
+// or nil if this is not an op-stack chain or the Jovian fork is not active.
+func NewFloorDataGasFunc(config *params.ChainConfig, statedb StateGetter) FloorDataGasFunc {
+	if config.Optimism == nil {
+		return nil
+	}
+	forBlock := ^uint64(0)
+	var cachedFunc func([]byte) (uint64, error)
+
+	selectFunc := func(blockTime uint64) func([]byte) (uint64, error) {
+		if !config.IsOptimismJovian(blockTime) {
+			// Before Jovian, use default EIP-7623 parameters
+			return func(data []byte) (uint64, error) {
+				return defaultFloorDataGas(data)
+			}
+		}
+		calldataGasCostParams := statedb.GetState(L1BlockAddr, CalldataGasCostParamsSlot)
+		if calldataGasCostParams == (common.Hash{}) {
+			// If parameters not set, use defaults
+			return func(data []byte) (uint64, error) {
+				return defaultFloorDataGas(data)
+			}
+		}
+		eip7623StandardTokenCost, eip7623TotalCostFloorPerToken := ExtractCalldataGasCostParams(calldataGasCostParams)
+
+		return newFloorDataGasFunc(eip7623StandardTokenCost, eip7623TotalCostFloorPerToken)
+	}
+
+	return func(data []byte, blockTime uint64) (uint64, error) {
+		if forBlock != blockTime {
+			forBlock = blockTime
+			cachedFunc = selectFunc(blockTime)
+		}
+
+		return cachedFunc(data)
+	}
+}
+
+// defaultFloorDataGas computes the minimum gas required for a transaction based on its data tokens (EIP-7623)
+// using default parameters. This duplicates the logic from core.FloorDataGas to avoid circular imports.
+func defaultFloorDataGas(data []byte) (uint64, error) {
+	var (
+		z      = uint64(bytes.Count(data, []byte{0}))
+		nz     = uint64(len(data)) - z
+		tokens = nz*params.TxTokenPerNonZeroByte + z
+	)
+	// Check for overflow
+	if (math.MaxUint64-params.TxGas)/params.TxCostFloorPerToken < tokens {
+		return 0, ErrGasUintOverflow
+	}
+	// Minimum gas required for a transaction based on its data tokens (EIP-7623).
+	return params.TxGas + tokens*params.TxCostFloorPerToken, nil
+}
+
+func newFloorDataGasFunc(standardTokenCost, totalCostFloorPerToken *big.Int) func([]byte) (uint64, error) {
+	return func(data []byte) (uint64, error) {
+		var (
+			z      = uint64(bytes.Count(data, []byte{0}))
+			nz     = uint64(len(data)) - z
+			tokens = nz*standardTokenCost.Uint64() + z
+		)
+		// Check for overflow
+		floorPerToken := totalCostFloorPerToken.Uint64()
+		if tokens > 0 && (math.MaxUint64-params.TxGas)/floorPerToken < tokens {
+			return 0, ErrGasUintOverflow
+		}
+		// Minimum gas required for a transaction based on its data tokens with configurable parameters
+		return params.TxGas + tokens*floorPerToken, nil
+	}
+}
+
 func newOperatorCostFunc(operatorFeeScalar *big.Int, operatorFeeConstant *big.Int) operatorCostFunc {
 	return func(gas uint64) *uint256.Int {
 		fee := new(big.Int).SetUint64(gas)
@@ -359,14 +443,16 @@ func NewTotalRollupCostFunc(config *params.ChainConfig, statedb StateGetter) Tot
 }
 
 type gasParams struct {
-	l1BaseFee           *big.Int
-	l1BlobBaseFee       *big.Int
-	costFunc            l1CostFunc
-	feeScalar           *big.Float // pre-ecotone
-	l1BaseFeeScalar     *uint32    // post-ecotone
-	l1BlobBaseFeeScalar *uint32    // post-ecotone
-	operatorFeeScalar   *uint32    // post-Isthmus
-	operatorFeeConstant *uint64    // post-Isthmus
+	l1BaseFee                     *big.Int
+	l1BlobBaseFee                 *big.Int
+	costFunc                      l1CostFunc
+	feeScalar                     *big.Float // pre-ecotone
+	l1BaseFeeScalar               *uint32    // post-ecotone
+	l1BlobBaseFeeScalar           *uint32    // post-ecotone
+	operatorFeeScalar             *uint32    // post-Isthmus
+	operatorFeeConstant           *uint64    // post-Isthmus
+	eip7623StandardTokenCost      *uint8     // post-Jovian
+	eip7623TotalCostFloorPerToken *uint32    // post-Jovian (uint24 stored as uint32)
 }
 
 // intToScaledFloat returns scalar/10e6 as a float
@@ -509,6 +595,49 @@ func extractL1GasParamsPostIsthmus(data []byte) (gasParams, error) {
 	}, nil
 }
 
+// extractL1GasParamsPostJovian extracts the gas parameters necessary to compute gas from L1 attribute
+// info calldata after the Jovian upgrade, but not for the very first Jovian block.
+func extractL1GasParamsPostJovian(data []byte) (gasParams, error) {
+	if len(data) != 180 {
+		return gasParams{}, fmt.Errorf("expected 180 L1 info bytes, got %d", len(data))
+	}
+	// data layout assumed for Jovian:
+	// offset type varname
+	// 0     <selector>
+	// 4     uint32 _basefeeScalar
+	// 8     uint32 _blobBaseFeeScalar
+	// 12    uint64 _sequenceNumber,
+	// 20    uint64 _timestamp,
+	// 28    uint64 _l1BlockNumber
+	// 36    uint256 _basefee,
+	// 68    uint256 _blobBaseFee,
+	// 100   bytes32 _hash,
+	// 132   bytes32 _batcherHash,
+	// 164   uint32  _operatorFeeScalar
+	// 168   uint64  _operatorFeeConstant
+	// 176   uint8   _eip7623StandardTokenCost
+	// 177   uint24  _eip7623TotalCostFloorPerToken (3 bytes)
+	l1BaseFee := new(big.Int).SetBytes(data[36:68])
+	l1BlobBaseFee := new(big.Int).SetBytes(data[68:100])
+	l1BaseFeeScalar := binary.BigEndian.Uint32(data[4:8])
+	l1BlobBaseFeeScalar := binary.BigEndian.Uint32(data[8:12])
+	operatorFeeScalar := binary.BigEndian.Uint32(data[164:168])
+	operatorFeeConstant := binary.BigEndian.Uint64(data[168:176])
+	eip7623StandardTokenCost := data[176]
+	eip7623TotalCostFloorPerToken := binary.BigEndian.Uint32(data[176:180]) & 0x00FFFFFF // uint24 in lower 3 bytes
+
+	return gasParams{
+		l1BaseFee:                     l1BaseFee,
+		l1BlobBaseFee:                 l1BlobBaseFee,
+		l1BaseFeeScalar:               &l1BaseFeeScalar,
+		l1BlobBaseFeeScalar:           &l1BlobBaseFeeScalar,
+		operatorFeeScalar:             &operatorFeeScalar,
+		operatorFeeConstant:           &operatorFeeConstant,
+		eip7623StandardTokenCost:      &eip7623StandardTokenCost,
+		eip7623TotalCostFloorPerToken: &eip7623TotalCostFloorPerToken,
+	}, nil
+}
+
 // L1Cost computes the the data availability fee for transactions in blocks prior to the Ecotone
 // upgrade. It is used by e2e tests so must remain exported.
 func L1Cost(rollupDataGas uint64, l1BaseFee, overhead, scalar *big.Int) *big.Int {
@@ -575,6 +704,12 @@ func ExtractEcotoneFeeParams(l1FeeParams []byte) (l1BaseFeeScalar, l1BlobBaseFee
 func ExtractOperatorFeeParams(operatorFeeParams common.Hash) (operatorFeeScalar, operatorFeeConstant *big.Int) {
 	operatorFeeScalar = new(big.Int).SetBytes(operatorFeeParams[20:24])
 	operatorFeeConstant = new(big.Int).SetBytes(operatorFeeParams[24:32])
+	return
+}
+
+func ExtractCalldataGasCostParams(calldataGasCostParams common.Hash) (eip7623StandardTokenCost, eip7623TotalCostFloorPerToken *big.Int) {
+	eip7623StandardTokenCost = new(big.Int).SetBytes(calldataGasCostParams[28:29])      // uint8 at byte [28]
+	eip7623TotalCostFloorPerToken = new(big.Int).SetBytes(calldataGasCostParams[29:32]) // uint24 at bytes [29:32]
 	return
 }
 

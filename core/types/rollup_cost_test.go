@@ -21,9 +21,11 @@ var (
 
 	blobBaseFee         = big.NewInt(10 * 1e6)
 	baseFeeScalar       = big.NewInt(2)
-	blobBaseFeeScalar   = big.NewInt(3)
-	operatorFeeScalar   = big.NewInt(1439103868)
-	operatorFeeConstant = big.NewInt(1256417826609331460)
+	blobBaseFeeScalar         = big.NewInt(3)
+	operatorFeeScalar         = big.NewInt(1439103868)
+	operatorFeeConstant       = big.NewInt(1256417826609331460)
+	eip7623StandardTokenCost  = big.NewInt(4)  // uint8 default value
+	eip7623TotalCostFloorPerToken = big.NewInt(10) // uint24 default value
 
 	// below are the expected cost func outcomes for the above parameter settings on the emptyTx
 	// which is defined in transaction_test.go
@@ -322,6 +324,35 @@ func getIsthmusL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScal
 	return data
 }
 
+func getJovianL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScalar, operatorFeeScalar, operatorFeeConstant, eip7623StandardTokenCost, eip7623TotalCostFloorPerToken *big.Int) []byte {
+	ignored := big.NewInt(1234)
+	data := []byte{}
+	uint256Slice := make([]byte, 32)
+	uint64Slice := make([]byte, 8)
+	uint32Slice := make([]byte, 4)
+	// Note: no JovianL1AttributesSelector yet, using Isthmus for now
+	data = append(data, IsthmusL1AttributesSelector...)
+	data = append(data, baseFeeScalar.FillBytes(uint32Slice)...)
+	data = append(data, blobBaseFeeScalar.FillBytes(uint32Slice)...)
+	data = append(data, ignored.FillBytes(uint64Slice)...)
+	data = append(data, ignored.FillBytes(uint64Slice)...)
+	data = append(data, ignored.FillBytes(uint64Slice)...)
+	data = append(data, baseFee.FillBytes(uint256Slice)...)
+	data = append(data, blobBaseFee.FillBytes(uint256Slice)...)
+	data = append(data, ignored.FillBytes(uint256Slice)...)
+	data = append(data, ignored.FillBytes(uint256Slice)...)
+	data = append(data, operatorFeeScalar.FillBytes(uint32Slice)...)
+	data = append(data, operatorFeeConstant.FillBytes(uint64Slice)...)
+	// Add EIP-7623 parameters
+	data = append(data, byte(eip7623StandardTokenCost.Uint64())) // uint8
+	// Pack uint24 as 3 bytes in big-endian
+	val24 := eip7623TotalCostFloorPerToken.Uint64()
+	data = append(data, byte((val24>>16)&0xFF))
+	data = append(data, byte((val24>>8)&0xFF))
+	data = append(data, byte(val24&0xFF))
+	return data
+}
+
 type testStateGetter struct {
 	baseFee, blobBaseFee, overhead, scalar *big.Int
 	baseFeeScalar, blobBaseFeeScalar       uint32
@@ -546,4 +577,75 @@ func TestTotalRollupCostFunc(t *testing.T) {
 	require.NotNil(t, cost)
 	expCost.Add(expCost, ithmusOperatorFee)
 	require.Equal(t, expCost, cost, "Isthmus total rollup cost should contain L1 cost and operator cost")
+}
+
+func TestExtractCalldataGasCostParams(t *testing.T) {
+	// Test parameter extraction with default values
+	var calldataParams common.Hash
+	
+	// Pack uint8 (4) at byte 28 and uint24 (10) at bytes 29-32
+	calldataParams[28] = 4  // eip7623StandardTokenCost
+	calldataParams[29] = 0  // eip7623TotalCostFloorPerToken upper byte
+	calldataParams[30] = 0  // eip7623TotalCostFloorPerToken middle byte  
+	calldataParams[31] = 10 // eip7623TotalCostFloorPerToken lower byte
+	
+	standardCost, totalCostFloor := ExtractCalldataGasCostParams(calldataParams)
+	
+	require.Equal(t, big.NewInt(4), standardCost)
+	require.Equal(t, big.NewInt(10), totalCostFloor)
+	
+	// Test with non-default values
+	calldataParams[28] = 8   // eip7623StandardTokenCost = 8
+	calldataParams[29] = 0   // eip7623TotalCostFloorPerToken = 0x0000FF = 255
+	calldataParams[30] = 0
+	calldataParams[31] = 255
+	
+	standardCost, totalCostFloor = ExtractCalldataGasCostParams(calldataParams)
+	
+	require.Equal(t, big.NewInt(8), standardCost)
+	require.Equal(t, big.NewInt(255), totalCostFloor)
+}
+
+func TestExtractJovianGasParams(t *testing.T) {
+	zeroTime := uint64(0)
+	// create a config where jovian is active  
+	config := &params.ChainConfig{
+		Optimism:     params.OptimismTestConfig.Optimism,
+		RegolithTime: &zeroTime,
+		EcotoneTime:  &zeroTime,
+		FjordTime:    &zeroTime,
+		HoloceneTime: &zeroTime,
+		IsthmusTime:  &zeroTime,
+		JovianTime:   &zeroTime,
+	}
+	require.True(t, config.IsOptimismJovian(zeroTime))
+
+	data := getJovianL1Attributes(
+		baseFee,
+		blobBaseFee,
+		baseFeeScalar,
+		blobBaseFeeScalar,
+		operatorFeeScalar,
+		operatorFeeConstant,
+		eip7623StandardTokenCost,
+		eip7623TotalCostFloorPerToken,
+	)
+
+	gasparams, err := extractL1GasParamsPostJovian(data)
+	require.NoError(t, err)
+	
+	require.Equal(t, baseFee, gasparams.l1BaseFee)
+	require.Equal(t, blobBaseFee, gasparams.l1BlobBaseFee)
+	require.Equal(t, uint32(baseFeeScalar.Uint64()), *gasparams.l1BaseFeeScalar)
+	require.Equal(t, uint32(blobBaseFeeScalar.Uint64()), *gasparams.l1BlobBaseFeeScalar)
+	require.Equal(t, uint32(operatorFeeScalar.Uint64()), *gasparams.operatorFeeScalar)
+	require.Equal(t, operatorFeeConstant.Uint64(), *gasparams.operatorFeeConstant)
+	require.Equal(t, uint8(eip7623StandardTokenCost.Uint64()), *gasparams.eip7623StandardTokenCost)
+	require.Equal(t, uint32(eip7623TotalCostFloorPerToken.Uint64()), *gasparams.eip7623TotalCostFloorPerToken)
+
+	// Test with wrong data length
+	data = data[:len(data)-1] // remove one byte
+	_, err = extractL1GasParamsPostJovian(data)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "expected 180 L1 info bytes")
 }
