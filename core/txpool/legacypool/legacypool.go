@@ -178,7 +178,6 @@ var DefaultConfig = Config{
 	AccountQueue: 64,
 	GlobalQueue:  1024,
 
-
 	MaxTxGasLimit: 0, // 0 means no limit (default behavior)
 
 	Lifetime:       3 * time.Hour,
