@@ -80,12 +80,13 @@ type GenesisRef struct {
 }
 
 type SystemConfig struct {
-	BatcherAddr       common.Address `json:"batcherAddr" toml:"batcherAddress"`
-	Overhead          common.Hash    `json:"overhead" toml:"overhead"`
-	Scalar            common.Hash    `json:"scalar" toml:"scalar"`
-	GasLimit          uint64         `json:"gasLimit" toml:"gasLimit"`
-	BaseFeeScalar     *uint64        `json:"baseFeeScalar,omitempty" toml:"baseFeeScalar,omitempty"`
-	BlobBaseFeeScalar *uint64        `json:"blobBaseFeeScalar,omitempty" toml:"blobBaseFeeScalar,omitempty"`
+	BatcherAddr                   common.Address `json:"batcherAddr" toml:"batcherAddress"`
+	Overhead                      common.Hash    `json:"overhead" toml:"overhead"`
+	Scalar                        common.Hash    `json:"scalar" toml:"scalar"`
+	GasLimit                      uint64         `json:"gasLimit" toml:"gasLimit"`
+	BaseFeeScalar                 *uint64        `json:"baseFeeScalar,omitempty" toml:"baseFeeScalar,omitempty"`
+	BlobBaseFeeScalar             *uint64        `json:"blobBaseFeeScalar,omitempty" toml:"blobBaseFeeScalar,omitempty"`
+	CalldataGasPerCompressedByte  *uint32        `json:"calldataGasPerCompressedByte,omitempty" toml:"calldataGasPerCompressedByte,omitempty"`
 }
 
 type RolesConfig struct {
