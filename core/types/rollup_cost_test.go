@@ -24,8 +24,7 @@ var (
 	blobBaseFeeScalar         = big.NewInt(3)
 	operatorFeeScalar         = big.NewInt(1439103868)
 	operatorFeeConstant       = big.NewInt(1256417826609331460)
-	eip7623StandardTokenCost  = big.NewInt(4)  // uint8 default value
-	eip7623TotalCostFloorPerToken = big.NewInt(10) // uint24 default value
+	calldataGasPerCompressedByte = big.NewInt(int64(DefaultCalldataGasPerCompressedByte)) // uint32 default value
 
 	// below are the expected cost func outcomes for the above parameter settings on the emptyTx
 	// which is defined in transaction_test.go
@@ -324,7 +323,7 @@ func getIsthmusL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScal
 	return data
 }
 
-func getJovianL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScalar, operatorFeeScalar, operatorFeeConstant, eip7623StandardTokenCost, eip7623TotalCostFloorPerToken *big.Int) []byte {
+func getJovianL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScalar, operatorFeeScalar, operatorFeeConstant, calldataGasPerCompressedByte *big.Int) []byte {
 	ignored := big.NewInt(1234)
 	data := []byte{}
 	uint256Slice := make([]byte, 32)
@@ -343,13 +342,8 @@ func getJovianL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScala
 	data = append(data, ignored.FillBytes(uint256Slice)...)
 	data = append(data, operatorFeeScalar.FillBytes(uint32Slice)...)
 	data = append(data, operatorFeeConstant.FillBytes(uint64Slice)...)
-	// Add EIP-7623 parameters
-	data = append(data, byte(eip7623StandardTokenCost.Uint64())) // uint8
-	// Pack uint24 as 3 bytes in big-endian
-	val24 := eip7623TotalCostFloorPerToken.Uint64()
-	data = append(data, byte((val24>>16)&0xFF))
-	data = append(data, byte((val24>>8)&0xFF))
-	data = append(data, byte(val24&0xFF))
+	// Add calldata gas per compressed byte parameter
+	data = append(data, calldataGasPerCompressedByte.FillBytes(uint32Slice)...) // uint32
 	return data
 }
 
@@ -580,30 +574,22 @@ func TestTotalRollupCostFunc(t *testing.T) {
 }
 
 func TestExtractCalldataGasCostParams(t *testing.T) {
-	// Test parameter extraction with default values
+	// Test parameter extraction with default value (120)
 	var calldataParams common.Hash
 	
-	// Pack uint8 (4) at byte 28 and uint24 (10) at bytes 29-32
-	calldataParams[28] = 4  // eip7623StandardTokenCost
-	calldataParams[29] = 0  // eip7623TotalCostFloorPerToken upper byte
-	calldataParams[30] = 0  // eip7623TotalCostFloorPerToken middle byte  
-	calldataParams[31] = 10 // eip7623TotalCostFloorPerToken lower byte
+	// Pack uint32 (default value) at bytes 28-32
+	binary.BigEndian.PutUint32(calldataParams[28:32], DefaultCalldataGasPerCompressedByte)
 	
-	standardCost, totalCostFloor := ExtractCalldataGasCostParams(calldataParams)
+	calldataGasPerCompressedByte := ExtractCalldataGasCostParams(calldataParams)
 	
-	require.Equal(t, big.NewInt(4), standardCost)
-	require.Equal(t, big.NewInt(10), totalCostFloor)
+	require.Equal(t, big.NewInt(int64(DefaultCalldataGasPerCompressedByte)), calldataGasPerCompressedByte)
 	
-	// Test with non-default values
-	calldataParams[28] = 8   // eip7623StandardTokenCost = 8
-	calldataParams[29] = 0   // eip7623TotalCostFloorPerToken = 0x0000FF = 255
-	calldataParams[30] = 0
-	calldataParams[31] = 255
+	// Test with non-default value (200)
+	binary.BigEndian.PutUint32(calldataParams[28:32], 200)
 	
-	standardCost, totalCostFloor = ExtractCalldataGasCostParams(calldataParams)
+	calldataGasPerCompressedByte = ExtractCalldataGasCostParams(calldataParams)
 	
-	require.Equal(t, big.NewInt(8), standardCost)
-	require.Equal(t, big.NewInt(255), totalCostFloor)
+	require.Equal(t, big.NewInt(200), calldataGasPerCompressedByte)
 }
 
 func TestExtractJovianGasParams(t *testing.T) {
@@ -627,8 +613,7 @@ func TestExtractJovianGasParams(t *testing.T) {
 		blobBaseFeeScalar,
 		operatorFeeScalar,
 		operatorFeeConstant,
-		eip7623StandardTokenCost,
-		eip7623TotalCostFloorPerToken,
+		calldataGasPerCompressedByte,
 	)
 
 	gasparams, err := extractL1GasParamsPostJovian(data)
@@ -640,8 +625,7 @@ func TestExtractJovianGasParams(t *testing.T) {
 	require.Equal(t, uint32(blobBaseFeeScalar.Uint64()), *gasparams.l1BlobBaseFeeScalar)
 	require.Equal(t, uint32(operatorFeeScalar.Uint64()), *gasparams.operatorFeeScalar)
 	require.Equal(t, operatorFeeConstant.Uint64(), *gasparams.operatorFeeConstant)
-	require.Equal(t, uint8(eip7623StandardTokenCost.Uint64()), *gasparams.eip7623StandardTokenCost)
-	require.Equal(t, uint32(eip7623TotalCostFloorPerToken.Uint64()), *gasparams.eip7623TotalCostFloorPerToken)
+	require.Equal(t, uint32(calldataGasPerCompressedByte.Uint64()), *gasparams.calldataGasPerCompressedByte)
 
 	// Test with wrong data length
 	data = data[:len(data)-1] // remove one byte

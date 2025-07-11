@@ -1651,11 +1651,8 @@ func marshalReceipt(receipt *types.Receipt, blockHash common.Hash, blockNumber u
 			fields["operatorFeeConstant"] = hexutil.Uint64(*receipt.OperatorFeeConstant)
 		}
 		// Fields added in Jovian
-		if receipt.Eip7623StandardTokenCost != nil {
-			fields["eip7623StandardTokenCost"] = hexutil.Uint64(*receipt.Eip7623StandardTokenCost)
-		}
-		if receipt.Eip7623TotalCostFloorPerToken != nil {
-			fields["eip7623TotalCostFloorPerToken"] = hexutil.Uint64(*receipt.Eip7623TotalCostFloorPerToken)
+		if receipt.CalldataGasPerCompressedByte != nil {
+			fields["calldataGasPerCompressedByte"] = hexutil.Uint64(*receipt.CalldataGasPerCompressedByte)
 		}
 	}
 	if chainConfig.Optimism != nil && tx.IsDepositTx() && receipt.DepositNonce != nil {
