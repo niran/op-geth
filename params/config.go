@@ -1311,7 +1311,8 @@ type Rules struct {
 	IsOptimismBedrock, IsOptimismRegolith                   bool
 	IsOptimismCanyon, IsOptimismFjord                       bool
 	IsOptimismGranite, IsOptimismHolocene                   bool
-	IsOptimismIsthmus                                       bool
+	IsOptimismIsthmus, IsOptimismJovian                     bool
+	IsOptimismBase                                          bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -1351,6 +1352,8 @@ func (c *ChainConfig) Rules(num *big.Int, isMerge bool, timestamp uint64) Rules 
 		IsOptimismGranite:  isMerge && c.IsOptimismGranite(timestamp),
 		IsOptimismHolocene: isMerge && c.IsOptimismHolocene(timestamp),
 		IsOptimismIsthmus:  isMerge && c.IsOptimismIsthmus(timestamp),
+		IsOptimismJovian:   isMerge && c.IsOptimismJovian(timestamp),
+		IsOptimismBase:     isMerge && (c.ChainID == new(big.Int).SetUint64(8453) || c.ChainID == new(big.Int).SetUint64(84532)),
 	}
 }
 

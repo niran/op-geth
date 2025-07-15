@@ -63,6 +63,7 @@ var (
 	verkleInstructionSet           = newVerkleInstructionSet()
 	pragueInstructionSet           = newPragueInstructionSet()
 	eofInstructionSet              = newEOFInstructionSetForTesting()
+	jovianInstructionSetForBase    = newJovianInstructionSetForBase()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -99,6 +100,24 @@ func NewEOFInstructionSetForTesting() JumpTable {
 func newEOFInstructionSetForTesting() JumpTable {
 	instructionSet := newPragueInstructionSet()
 	enableEOF(&instructionSet)
+	return validate(instructionSet)
+}
+
+func newJovianInstructionSetForBase() JumpTable {
+	instructionSet := newPragueInstructionSet()
+
+	createOp := *instructionSet[CREATE]
+	createOp.constantGas = 480_000
+	instructionSet[CREATE] = &createOp
+
+	create2Op := *instructionSet[CREATE2]
+	create2Op.constantGas = 480_000
+	instructionSet[CREATE2] = &create2Op
+
+	callOp := *instructionSet[CALL]
+	callOp.dynamicGas = gasCallJovianBase
+	instructionSet[CALL] = &callOp
+
 	return validate(instructionSet)
 }
 
