@@ -438,7 +438,12 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 			if payloadAttributes.GasLimit == nil {
 				return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(errors.New("gasLimit parameter is required"))
 			}
-			if api.eth.BlockChain().Config().IsHolocene(payloadAttributes.Timestamp) {
+			if api.eth.BlockChain().Config().IsJovian(payloadAttributes.Timestamp) {
+				if err := eip1559.ValidateJovian1559Params(payloadAttributes.EIP1559Params); err != nil {
+					return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(err)
+				}
+				eip1559Params = bytes.Clone(payloadAttributes.EIP1559Params)
+			} else if api.eth.BlockChain().Config().IsHolocene(payloadAttributes.Timestamp) {
 				if err := eip1559.ValidateHolocene1559Params(payloadAttributes.EIP1559Params); err != nil {
 					return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(err)
 				}
