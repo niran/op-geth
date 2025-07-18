@@ -876,7 +876,11 @@ func (api *ConsensusAPI) newPayload(params engine.ExecutableData, versionedHashe
 	// check whether we already have the block locally.
 
 	// OP-Stack diff: payload must have empty extraData before Holocene and hold eip-1559 params after Holocene.
-	if cfg := api.eth.BlockChain().Config(); cfg.IsHolocene(params.Timestamp) {
+	if cfg := api.eth.BlockChain().Config(); cfg.IsJovian(params.Timestamp) {
+		if err := eip1559.ValidateJovianExtraData(params.ExtraData); err != nil {
+			return api.invalid(err, nil), nil
+		}
+	} else if cfg.IsHolocene(params.Timestamp) {
 		if err := eip1559.ValidateHoloceneExtraData(params.ExtraData); err != nil {
 			return api.invalid(err, nil), nil
 		}
