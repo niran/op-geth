@@ -441,12 +441,7 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 			if payloadAttributes.GasLimit == nil {
 				return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(errors.New("gasLimit parameter is required"))
 			}
-			if cfg.IsJovian(payloadAttributes.Timestamp) {
-				if err := eip1559.ValidateJovian1559Params(payloadAttributes.EIP1559Params); err != nil {
-					return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(err)
-				}
-				eip1559Params = bytes.Clone(payloadAttributes.EIP1559Params)
-			} else if cfg.IsHolocene(payloadAttributes.Timestamp) {
+			if cfg.IsHolocene(payloadAttributes.Timestamp) {
 				if err := eip1559.ValidateHolocene1559Params(payloadAttributes.EIP1559Params); err != nil {
 					return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(err)
 				}
@@ -880,7 +875,7 @@ func (api *ConsensusAPI) newPayload(params engine.ExecutableData, versionedHashe
 
 	// OP-Stack diff: payload must have empty extraData before Holocene and hold eip-1559 params after Holocene.
 	if cfg := api.eth.BlockChain().Config(); cfg.IsJovian(params.Timestamp) {
-		if err := eip1559.ValidateJovianExtraData(params.ExtraData); err != nil {
+		if err := eip1559.ValidateMinBaseFeeExtraData(params.ExtraData); err != nil {
 			return api.invalid(err, nil), nil
 		}
 	} else if cfg.IsHolocene(params.Timestamp) {
