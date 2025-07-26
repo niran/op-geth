@@ -65,6 +65,8 @@ var (
 	EcotoneL1AttributesSelector = []byte{0x44, 0x0a, 0x5e, 0x20}
 	// IsthmusL1AttributesSelector is the selector indicating Isthmus style L1 gas attributes.
 	IsthmusL1AttributesSelector = []byte{0x09, 0x89, 0x99, 0xbe}
+	// JovianL1AttributesSelector is the selector indicating Jovian style L1 gas attributes.
+	JovianL1AttributesSelector = []byte{0x3d, 0xb6, 0xbe, 0x2b}
 
 	// L1BlockAddr is the address of the L1Block contract which stores the L1 gas attributes.
 	L1BlockAddr = common.HexToAddress("0x4200000000000000000000000000000000000015")

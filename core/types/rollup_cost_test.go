@@ -329,8 +329,8 @@ func getConfigurableCalldataGasCostL1Attributes(baseFee, blobBaseFee, baseFeeSca
 	uint256Slice := make([]byte, 32)
 	uint64Slice := make([]byte, 8)
 	uint32Slice := make([]byte, 4)
-	// Note: no specific L1AttributesSelector for configurable calldata gas cost yet, using Isthmus for now
-	data = append(data, IsthmusL1AttributesSelector...)
+	// Assume that the Jovian selector is used for the configurable calldata gas cost feature
+	data = append(data, JovianL1AttributesSelector...)
 	data = append(data, baseFeeScalar.FillBytes(uint32Slice)...)
 	data = append(data, blobBaseFeeScalar.FillBytes(uint32Slice)...)
 	data = append(data, ignored.FillBytes(uint64Slice)...)
