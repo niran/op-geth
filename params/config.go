@@ -847,8 +847,8 @@ func (c *ChainConfig) IsOptimismJovian(time uint64) bool {
 	return c.IsOptimism() && c.IsJovian(time)
 }
 
-// IsConfigurableCalldataGasCostEnabled returns true if the configurable calldata gas cost feature is enabled.
-func (c *ChainConfig) IsConfigurableCalldataGasCostEnabled(time uint64) bool {
+// IsDataGasCostConfigEnabled returns true if the configurable data gas cost feature is enabled.
+func (c *ChainConfig) IsDataGasCostConfigEnabled(time uint64) bool {
 	return c.IsOptimismJovian(time)
 }
 

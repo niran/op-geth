@@ -522,7 +522,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 	}
 	// Gas limit suffices for the floor data cost (EIP-7623)
 	if rules.IsPrague {
-		// Configurable calldata gas costs use a closure that can pull the parameters from the chain state.
+		// Configurable data gas costs use a closure that can pull the parameters from the chain state.
 		if st.evm.Context.FloorDataGasFunc != nil {
 			floorDataGas, err = st.evm.Context.FloorDataGasFunc(msg.Data, st.evm.Context.Time)
 		} else {

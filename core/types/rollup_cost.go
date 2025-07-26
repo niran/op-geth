@@ -86,8 +86,8 @@ var (
 	// OperatorFeeParamsSlot stores the operatorFeeScalar and operatorFeeConstant L1 gas
 	// attributes
 	OperatorFeeParamsSlot = common.BigToHash(big.NewInt(8))
-	// CalldataGasCostParamsSlot stores the configurable calldata gas cost parameters
-	CalldataGasCostParamsSlot = common.BigToHash(big.NewInt(9))
+	// DataGasCostParamsSlot stores the configurable data gas cost parameters
+	DataGasCostParamsSlot = common.BigToHash(big.NewInt(9))
 
 	oneMillion     = big.NewInt(1_000_000)
 	ecotoneDivisor = big.NewInt(1_000_000 * 16)
@@ -100,9 +100,9 @@ var (
 	MinTransactionSize       = big.NewInt(100)
 	MinTransactionSizeScaled = new(big.Int).Mul(MinTransactionSize, big.NewInt(1e6))
 
-	// DefaultCalldataGasPerCompressedByte is the default gas cost per compressed byte of calldata
-	// used when configurable calldata gas cost feature is active but no custom parameter is configured
-	DefaultCalldataGasPerCompressedByte = uint32(120)
+	// DefaultDataGasPerCompressedByte is the default gas cost per compressed byte of data
+	// used when configurable data gas cost feature is active but no custom parameter is configured
+	DefaultDataGasPerCompressedByte = uint32(120)
 
 	emptyScalars = make([]byte, 8)
 )
@@ -268,18 +268,18 @@ func NewFloorDataGasFunc(config *params.ChainConfig, statedb StateGetter) FloorD
 	var cachedFunc func([]byte) (uint64, error)
 
 	selectFunc := func(blockTime uint64) func([]byte) (uint64, error) {
-		if !config.IsConfigurableCalldataGasCostEnabled(blockTime) {
-			// Before configurable calldata gas cost feature, use standard EIP-7623 logic
+		if !config.IsDataGasCostConfigEnabled(blockTime) {
+			// Before configurable data gas cost feature, use standard EIP-7623 logic
 			return floorDataGas
 		}
-		calldataGasCostParams := statedb.GetState(L1BlockAddr, CalldataGasCostParamsSlot)
-		if calldataGasCostParams == (common.Hash{}) {
+		dataGasCostParams := statedb.GetState(L1BlockAddr, DataGasCostParamsSlot)
+		if dataGasCostParams == (common.Hash{}) {
 			// If parameters not set, use FastLZ with default gas per compressed byte
-			return newFloorDataGasFunc(big.NewInt(int64(DefaultCalldataGasPerCompressedByte)))
+			return newFloorDataGasFunc(big.NewInt(int64(DefaultDataGasPerCompressedByte)))
 		}
-		calldataGasPerCompressedByte := ExtractCalldataGasCostParams(calldataGasCostParams)
+		dataGasPerCompressedByte := ExtractDataGasCostParams(dataGasCostParams)
 
-		return newFloorDataGasFunc(calldataGasPerCompressedByte)
+		return newFloorDataGasFunc(dataGasPerCompressedByte)
 	}
 
 	return func(data []byte, blockTime uint64) (uint64, error) {
@@ -308,27 +308,27 @@ func floorDataGas(data []byte) (uint64, error) {
 	return params.TxGas + tokens*params.TxCostFloorPerToken, nil
 }
 
-func newFloorDataGasFunc(calldataGasPerCompressedByte *big.Int) func([]byte) (uint64, error) {
+func newFloorDataGasFunc(dataGasPerCompressedByte *big.Int) func([]byte) (uint64, error) {
 	return func(data []byte) (uint64, error) {
 		// Use FastLZ compression size estimation instead of zero/nonzero byte counting
 		rcd := NewRollupCostData(data)
 		estimatedSizeScaled := rcd.estimatedDASizeScaled()
 		estimatedSize := new(big.Int).Div(estimatedSizeScaled, big.NewInt(1e6))
-		
-		// Calculate floor data gas: estimatedSize * calldataGasPerCompressedByte
-		floorDataGas := new(big.Int).Mul(estimatedSize, calldataGasPerCompressedByte)
-		
+
+		// Calculate floor data gas: estimatedSize * dataGasPerCompressedByte
+		floorDataGas := new(big.Int).Mul(estimatedSize, dataGasPerCompressedByte)
+
 		// Check for overflow
 		if !floorDataGas.IsUint64() {
 			return 0, ErrGasUintOverflow
 		}
-		
+
 		// Add base transaction gas
 		totalGas := params.TxGas + floorDataGas.Uint64()
 		if totalGas < params.TxGas { // overflow check
 			return 0, ErrGasUintOverflow
 		}
-		
+
 		return totalGas, nil
 	}
 }
@@ -453,14 +453,14 @@ func NewTotalRollupCostFunc(config *params.ChainConfig, statedb StateGetter) Tot
 }
 
 type gasParams struct {
-	l1BaseFee                     *big.Int
-	l1BlobBaseFee                 *big.Int
-	costFunc                      l1CostFunc
-	feeScalar                     *big.Float // pre-ecotone
-	l1BaseFeeScalar               *uint32    // post-ecotone
-	l1BlobBaseFeeScalar           *uint32    // post-ecotone
-	operatorFeeScalar             *uint32    // post-Isthmus
-	operatorFeeConstant           *uint64    // post-Isthmus
+	l1BaseFee           *big.Int
+	l1BlobBaseFee       *big.Int
+	costFunc            l1CostFunc
+	feeScalar           *big.Float // pre-ecotone
+	l1BaseFeeScalar     *uint32    // post-ecotone
+	l1BlobBaseFeeScalar *uint32    // post-ecotone
+	operatorFeeScalar   *uint32    // post-Isthmus
+	operatorFeeConstant *uint64    // post-Isthmus
 }
 
 // intToScaledFloat returns scalar/10e6 as a float
@@ -603,7 +603,6 @@ func extractL1GasParamsPostIsthmus(data []byte) (gasParams, error) {
 	}, nil
 }
 
-
 // L1Cost computes the the data availability fee for transactions in blocks prior to the Ecotone
 // upgrade. It is used by e2e tests so must remain exported.
 func L1Cost(rollupDataGas uint64, l1BaseFee, overhead, scalar *big.Int) *big.Int {
@@ -673,8 +672,8 @@ func ExtractOperatorFeeParams(operatorFeeParams common.Hash) (operatorFeeScalar,
 	return
 }
 
-func ExtractCalldataGasCostParams(calldataGasCostParams common.Hash) (calldataGasPerCompressedByte *big.Int) {
-	calldataGasPerCompressedByte = new(big.Int).SetBytes(calldataGasCostParams[28:32]) // uint32 at bytes [28:32]
+func ExtractDataGasCostParams(dataGasCostParams common.Hash) (dataGasPerCompressedByte *big.Int) {
+	dataGasPerCompressedByte = new(big.Int).SetBytes(dataGasCostParams[28:32]) // uint32 at bytes [28:32]
 	return
 }
 

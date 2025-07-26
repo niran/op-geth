@@ -21,10 +21,9 @@ var (
 
 	blobBaseFee         = big.NewInt(10 * 1e6)
 	baseFeeScalar       = big.NewInt(2)
-	blobBaseFeeScalar         = big.NewInt(3)
-	operatorFeeScalar         = big.NewInt(1439103868)
-	operatorFeeConstant       = big.NewInt(1256417826609331460)
-	calldataGasPerCompressedByte = big.NewInt(int64(DefaultCalldataGasPerCompressedByte)) // uint32 default value
+	blobBaseFeeScalar   = big.NewInt(3)
+	operatorFeeScalar   = big.NewInt(1439103868)
+	operatorFeeConstant = big.NewInt(1256417826609331460)
 
 	// below are the expected cost func outcomes for the above parameter settings on the emptyTx
 	// which is defined in transaction_test.go
@@ -323,7 +322,6 @@ func getIsthmusL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScal
 	return data
 }
 
-
 type testStateGetter struct {
 	baseFee, blobBaseFee, overhead, scalar *big.Int
 	baseFeeScalar, blobBaseFeeScalar       uint32
@@ -550,22 +548,21 @@ func TestTotalRollupCostFunc(t *testing.T) {
 	require.Equal(t, expCost, cost, "Isthmus total rollup cost should contain L1 cost and operator cost")
 }
 
-func TestExtractCalldataGasCostParams(t *testing.T) {
+func TestExtractDataGasCostParams(t *testing.T) {
 	// Test parameter extraction with default value (120)
-	var calldataParams common.Hash
-	
-	// Pack uint32 (default value) at bytes 28-32
-	binary.BigEndian.PutUint32(calldataParams[28:32], DefaultCalldataGasPerCompressedByte)
-	
-	calldataGasPerCompressedByte := ExtractCalldataGasCostParams(calldataParams)
-	
-	require.Equal(t, big.NewInt(int64(DefaultCalldataGasPerCompressedByte)), calldataGasPerCompressedByte)
-	
-	// Test with non-default value (200)
-	binary.BigEndian.PutUint32(calldataParams[28:32], 200)
-	
-	calldataGasPerCompressedByte = ExtractCalldataGasCostParams(calldataParams)
-	
-	require.Equal(t, big.NewInt(200), calldataGasPerCompressedByte)
-}
+	var dataParams common.Hash
 
+	// Pack uint32 (default value) at bytes 28-32
+	binary.BigEndian.PutUint32(dataParams[28:32], DefaultDataGasPerCompressedByte)
+
+	dataGasPerCompressedByte := ExtractDataGasCostParams(dataParams)
+
+	require.Equal(t, big.NewInt(int64(DefaultDataGasPerCompressedByte)), dataGasPerCompressedByte)
+
+	// Test with non-default value (200)
+	binary.BigEndian.PutUint32(dataParams[28:32], 200)
+
+	dataGasPerCompressedByte = ExtractDataGasCostParams(dataParams)
+
+	require.Equal(t, big.NewInt(200), dataGasPerCompressedByte)
+}
