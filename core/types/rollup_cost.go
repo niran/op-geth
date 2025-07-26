@@ -100,9 +100,9 @@ var (
 	MinTransactionSize       = big.NewInt(100)
 	MinTransactionSizeScaled = new(big.Int).Mul(MinTransactionSize, big.NewInt(1e6))
 
-	// DefaultDataGasPerCompressedByte is the default gas cost per compressed byte of data
+	// DefaultDataGasPerToken is the default gas cost per token of data
 	// used when configurable data gas cost feature is active but no custom parameter is configured
-	DefaultDataGasPerCompressedByte = uint32(120)
+	DefaultDataGasPerToken = uint32(120)
 
 	emptyScalars = make([]byte, 8)
 )
@@ -275,11 +275,11 @@ func NewFloorDataGasFunc(config *params.ChainConfig, statedb StateGetter) FloorD
 		dataGasCostParams := statedb.GetState(L1BlockAddr, DataGasCostParamsSlot)
 		if dataGasCostParams == (common.Hash{}) {
 			// If parameters not set, use FastLZ with default gas per compressed byte
-			return newFloorDataGasFunc(big.NewInt(int64(DefaultDataGasPerCompressedByte)))
+			return newFloorDataGasFunc(big.NewInt(int64(DefaultDataGasPerToken)))
 		}
-		dataGasPerCompressedByte := ExtractDataGasCostParams(dataGasCostParams)
+		dataGasPerToken := ExtractDataGasCostParams(dataGasCostParams)
 
-		return newFloorDataGasFunc(dataGasPerCompressedByte)
+		return newFloorDataGasFunc(dataGasPerToken)
 	}
 
 	return func(data []byte, blockTime uint64) (uint64, error) {
@@ -308,15 +308,15 @@ func floorDataGas(data []byte) (uint64, error) {
 	return params.TxGas + tokens*params.TxCostFloorPerToken, nil
 }
 
-func newFloorDataGasFunc(dataGasPerCompressedByte *big.Int) func([]byte) (uint64, error) {
+func newFloorDataGasFunc(dataGasPerToken *big.Int) func([]byte) (uint64, error) {
 	return func(data []byte) (uint64, error) {
 		// Use FastLZ compression size estimation instead of zero/nonzero byte counting
 		rcd := NewRollupCostData(data)
-		estimatedSizeScaled := rcd.estimatedDASizeScaled()
-		estimatedSize := new(big.Int).Div(estimatedSizeScaled, big.NewInt(1e6))
+		tokensScaled := rcd.estimatedDASizeScaled()
+		tokens := new(big.Int).Div(tokensScaled, big.NewInt(1e6))
 
-		// Calculate floor data gas: estimatedSize * dataGasPerCompressedByte
-		floorDataGas := new(big.Int).Mul(estimatedSize, dataGasPerCompressedByte)
+		// Calculate floor data gas: tokens * dataGasPerToken
+		floorDataGas := new(big.Int).Mul(tokens, dataGasPerToken)
 
 		// Check for overflow
 		if !floorDataGas.IsUint64() {
@@ -672,8 +672,8 @@ func ExtractOperatorFeeParams(operatorFeeParams common.Hash) (operatorFeeScalar,
 	return
 }
 
-func ExtractDataGasCostParams(dataGasCostParams common.Hash) (dataGasPerCompressedByte *big.Int) {
-	dataGasPerCompressedByte = new(big.Int).SetBytes(dataGasCostParams[28:32]) // uint32 at bytes [28:32]
+func ExtractDataGasCostParams(dataGasCostParams common.Hash) (dataGasPerToken *big.Int) {
+	dataGasPerToken = new(big.Int).SetBytes(dataGasCostParams[28:32]) // uint32 at bytes [28:32]
 	return
 }
 

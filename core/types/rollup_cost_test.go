@@ -553,16 +553,16 @@ func TestExtractDataGasCostParams(t *testing.T) {
 	var dataParams common.Hash
 
 	// Pack uint32 (default value) at bytes 28-32
-	binary.BigEndian.PutUint32(dataParams[28:32], DefaultDataGasPerCompressedByte)
+	binary.BigEndian.PutUint32(dataParams[28:32], DefaultDataGasPerToken)
 
-	dataGasPerCompressedByte := ExtractDataGasCostParams(dataParams)
+	dataGasPerToken := ExtractDataGasCostParams(dataParams)
 
-	require.Equal(t, big.NewInt(int64(DefaultDataGasPerCompressedByte)), dataGasPerCompressedByte)
+	require.Equal(t, big.NewInt(int64(DefaultDataGasPerToken)), dataGasPerToken)
 
 	// Test with non-default value (200)
 	binary.BigEndian.PutUint32(dataParams[28:32], 200)
 
-	dataGasPerCompressedByte = ExtractDataGasCostParams(dataParams)
+	dataGasPerToken = ExtractDataGasCostParams(dataParams)
 
-	require.Equal(t, big.NewInt(200), dataGasPerCompressedByte)
+	require.Equal(t, big.NewInt(200), dataGasPerToken)
 }
