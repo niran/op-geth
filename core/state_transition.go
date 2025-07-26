@@ -522,7 +522,7 @@ func (st *stateTransition) innerExecute() (*ExecutionResult, error) {
 	}
 	// Gas limit suffices for the floor data cost (EIP-7623)
 	if rules.IsPrague {
-		// Use configurable FloorDataGasFunc if available (Jovian+), otherwise use default
+		// Configurable calldata gas costs use a closure that can pull the parameters from the chain state.
 		if st.evm.Context.FloorDataGasFunc != nil {
 			floorDataGas, err = st.evm.Context.FloorDataGasFunc(msg.Data, st.evm.Context.Time)
 		} else {
