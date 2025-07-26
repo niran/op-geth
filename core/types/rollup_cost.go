@@ -461,7 +461,6 @@ type gasParams struct {
 	l1BlobBaseFeeScalar           *uint32    // post-ecotone
 	operatorFeeScalar             *uint32    // post-Isthmus
 	operatorFeeConstant           *uint64    // post-Isthmus
-	calldataGasPerCompressedByte  *uint32    // configurable calldata gas cost feature
 }
 
 // intToScaledFloat returns scalar/10e6 as a float
@@ -604,45 +603,6 @@ func extractL1GasParamsPostIsthmus(data []byte) (gasParams, error) {
 	}, nil
 }
 
-// extractL1GasParamsPostJovian extracts the gas parameters necessary to compute gas from L1 attribute
-// info calldata after the configurable calldata gas cost feature is enabled, but not for the very first block with the feature.
-func extractL1GasParamsPostJovian(data []byte) (gasParams, error) {
-	if len(data) != 180 {
-		return gasParams{}, fmt.Errorf("expected 180 L1 info bytes, got %d", len(data))
-	}
-	// data layout assumed for configurable calldata gas cost feature:
-	// offset type varname
-	// 0     <selector>
-	// 4     uint32 _basefeeScalar
-	// 8     uint32 _blobBaseFeeScalar
-	// 12    uint64 _sequenceNumber,
-	// 20    uint64 _timestamp,
-	// 28    uint64 _l1BlockNumber
-	// 36    uint256 _basefee,
-	// 68    uint256 _blobBaseFee,
-	// 100   bytes32 _hash,
-	// 132   bytes32 _batcherHash,
-	// 164   uint32  _operatorFeeScalar
-	// 168   uint64  _operatorFeeConstant
-	// 176   uint32  _calldataGasPerCompressedByte
-	l1BaseFee := new(big.Int).SetBytes(data[36:68])
-	l1BlobBaseFee := new(big.Int).SetBytes(data[68:100])
-	l1BaseFeeScalar := binary.BigEndian.Uint32(data[4:8])
-	l1BlobBaseFeeScalar := binary.BigEndian.Uint32(data[8:12])
-	operatorFeeScalar := binary.BigEndian.Uint32(data[164:168])
-	operatorFeeConstant := binary.BigEndian.Uint64(data[168:176])
-	calldataGasPerCompressedByte := binary.BigEndian.Uint32(data[176:180])
-
-	return gasParams{
-		l1BaseFee:                    l1BaseFee,
-		l1BlobBaseFee:                l1BlobBaseFee,
-		l1BaseFeeScalar:              &l1BaseFeeScalar,
-		l1BlobBaseFeeScalar:          &l1BlobBaseFeeScalar,
-		operatorFeeScalar:            &operatorFeeScalar,
-		operatorFeeConstant:          &operatorFeeConstant,
-		calldataGasPerCompressedByte: &calldataGasPerCompressedByte,
-	}, nil
-}
 
 // L1Cost computes the the data availability fee for transactions in blocks prior to the Ecotone
 // upgrade. It is used by e2e tests so must remain exported.

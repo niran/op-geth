@@ -599,9 +599,6 @@ func (rs Receipts) DeriveFields(config *params.ChainConfig, hash common.Hash, nu
 				rs[i].OperatorFeeScalar = u32ptrTou64ptr(gasParams.operatorFeeScalar)
 				rs[i].OperatorFeeConstant = gasParams.operatorFeeConstant
 			}
-			if gasParams.calldataGasPerCompressedByte != nil {
-				rs[i].CalldataGasPerCompressedByte = u32ptrTou64ptr(gasParams.calldataGasPerCompressedByte)
-			}
 		}
 	}
 	return nil

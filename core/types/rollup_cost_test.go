@@ -323,29 +323,6 @@ func getIsthmusL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScal
 	return data
 }
 
-func getConfigurableCalldataGasCostL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScalar, operatorFeeScalar, operatorFeeConstant, calldataGasPerCompressedByte *big.Int) []byte {
-	ignored := big.NewInt(1234)
-	data := []byte{}
-	uint256Slice := make([]byte, 32)
-	uint64Slice := make([]byte, 8)
-	uint32Slice := make([]byte, 4)
-	// Assume that the Jovian selector is used for the configurable calldata gas cost feature
-	data = append(data, JovianL1AttributesSelector...)
-	data = append(data, baseFeeScalar.FillBytes(uint32Slice)...)
-	data = append(data, blobBaseFeeScalar.FillBytes(uint32Slice)...)
-	data = append(data, ignored.FillBytes(uint64Slice)...)
-	data = append(data, ignored.FillBytes(uint64Slice)...)
-	data = append(data, ignored.FillBytes(uint64Slice)...)
-	data = append(data, baseFee.FillBytes(uint256Slice)...)
-	data = append(data, blobBaseFee.FillBytes(uint256Slice)...)
-	data = append(data, ignored.FillBytes(uint256Slice)...)
-	data = append(data, ignored.FillBytes(uint256Slice)...)
-	data = append(data, operatorFeeScalar.FillBytes(uint32Slice)...)
-	data = append(data, operatorFeeConstant.FillBytes(uint64Slice)...)
-	// Add configurable calldata gas per compressed byte parameter
-	data = append(data, calldataGasPerCompressedByte.FillBytes(uint32Slice)...) // uint32
-	return data
-}
 
 type testStateGetter struct {
 	baseFee, blobBaseFee, overhead, scalar *big.Int
@@ -592,44 +569,3 @@ func TestExtractCalldataGasCostParams(t *testing.T) {
 	require.Equal(t, big.NewInt(200), calldataGasPerCompressedByte)
 }
 
-func TestExtractConfigurableCalldataGasCostParams(t *testing.T) {
-	zeroTime := uint64(0)
-	// create a config where configurable calldata gas cost feature is active  
-	config := &params.ChainConfig{
-		Optimism:     params.OptimismTestConfig.Optimism,
-		RegolithTime: &zeroTime,
-		EcotoneTime:  &zeroTime,
-		FjordTime:    &zeroTime,
-		HoloceneTime: &zeroTime,
-		IsthmusTime:  &zeroTime,
-		JovianTime:   &zeroTime,
-	}
-	require.True(t, config.IsConfigurableCalldataGasCostEnabled(zeroTime))
-
-	data := getConfigurableCalldataGasCostL1Attributes(
-		baseFee,
-		blobBaseFee,
-		baseFeeScalar,
-		blobBaseFeeScalar,
-		operatorFeeScalar,
-		operatorFeeConstant,
-		calldataGasPerCompressedByte,
-	)
-
-	gasparams, err := extractL1GasParamsPostJovian(data)
-	require.NoError(t, err)
-	
-	require.Equal(t, baseFee, gasparams.l1BaseFee)
-	require.Equal(t, blobBaseFee, gasparams.l1BlobBaseFee)
-	require.Equal(t, uint32(baseFeeScalar.Uint64()), *gasparams.l1BaseFeeScalar)
-	require.Equal(t, uint32(blobBaseFeeScalar.Uint64()), *gasparams.l1BlobBaseFeeScalar)
-	require.Equal(t, uint32(operatorFeeScalar.Uint64()), *gasparams.operatorFeeScalar)
-	require.Equal(t, operatorFeeConstant.Uint64(), *gasparams.operatorFeeConstant)
-	require.Equal(t, uint32(calldataGasPerCompressedByte.Uint64()), *gasparams.calldataGasPerCompressedByte)
-
-	// Test with wrong data length
-	data = data[:len(data)-1] // remove one byte
-	_, err = extractL1GasParamsPostJovian(data)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "expected 180 L1 info bytes")
-}
