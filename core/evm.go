@@ -71,7 +71,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	if config.IsOptimismIsthmus(header.Time) {
 		operatorCostFn = types.NewOperatorCostFunc(config, statedb)
 	}
-	if config.IsOptimismJovian(header.Time) {
+	if config.IsConfigurableCalldataGasCostEnabled(header.Time) {
 		floorDataGasFn = types.NewFloorDataGasFunc(config, statedb)
 	}
 	return vm.BlockContext{

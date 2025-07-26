@@ -323,13 +323,13 @@ func getIsthmusL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScal
 	return data
 }
 
-func getJovianL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScalar, operatorFeeScalar, operatorFeeConstant, calldataGasPerCompressedByte *big.Int) []byte {
+func getConfigurableCalldataGasCostL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScalar, operatorFeeScalar, operatorFeeConstant, calldataGasPerCompressedByte *big.Int) []byte {
 	ignored := big.NewInt(1234)
 	data := []byte{}
 	uint256Slice := make([]byte, 32)
 	uint64Slice := make([]byte, 8)
 	uint32Slice := make([]byte, 4)
-	// Note: no JovianL1AttributesSelector yet, using Isthmus for now
+	// Note: no specific L1AttributesSelector for configurable calldata gas cost yet, using Isthmus for now
 	data = append(data, IsthmusL1AttributesSelector...)
 	data = append(data, baseFeeScalar.FillBytes(uint32Slice)...)
 	data = append(data, blobBaseFeeScalar.FillBytes(uint32Slice)...)
@@ -342,7 +342,7 @@ func getJovianL1Attributes(baseFee, blobBaseFee, baseFeeScalar, blobBaseFeeScala
 	data = append(data, ignored.FillBytes(uint256Slice)...)
 	data = append(data, operatorFeeScalar.FillBytes(uint32Slice)...)
 	data = append(data, operatorFeeConstant.FillBytes(uint64Slice)...)
-	// Add calldata gas per compressed byte parameter
+	// Add configurable calldata gas per compressed byte parameter
 	data = append(data, calldataGasPerCompressedByte.FillBytes(uint32Slice)...) // uint32
 	return data
 }
@@ -592,9 +592,9 @@ func TestExtractCalldataGasCostParams(t *testing.T) {
 	require.Equal(t, big.NewInt(200), calldataGasPerCompressedByte)
 }
 
-func TestExtractJovianGasParams(t *testing.T) {
+func TestExtractConfigurableCalldataGasCostParams(t *testing.T) {
 	zeroTime := uint64(0)
-	// create a config where jovian is active  
+	// create a config where configurable calldata gas cost feature is active  
 	config := &params.ChainConfig{
 		Optimism:     params.OptimismTestConfig.Optimism,
 		RegolithTime: &zeroTime,
@@ -604,9 +604,9 @@ func TestExtractJovianGasParams(t *testing.T) {
 		IsthmusTime:  &zeroTime,
 		JovianTime:   &zeroTime,
 	}
-	require.True(t, config.IsOptimismJovian(zeroTime))
+	require.True(t, config.IsConfigurableCalldataGasCostEnabled(zeroTime))
 
-	data := getJovianL1Attributes(
+	data := getConfigurableCalldataGasCostL1Attributes(
 		baseFee,
 		blobBaseFee,
 		baseFeeScalar,

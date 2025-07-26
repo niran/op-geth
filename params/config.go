@@ -847,6 +847,11 @@ func (c *ChainConfig) IsOptimismJovian(time uint64) bool {
 	return c.IsOptimism() && c.IsJovian(time)
 }
 
+// IsConfigurableCalldataGasCostEnabled returns true if the configurable calldata gas cost feature is enabled.
+func (c *ChainConfig) IsConfigurableCalldataGasCostEnabled(time uint64) bool {
+	return c.IsOptimismJovian(time)
+}
+
 // IsOptimismPreBedrock returns true iff this is an optimism node & bedrock is not yet active
 func (c *ChainConfig) IsOptimismPreBedrock(num *big.Int) bool {
 	return c.IsOptimism() && !c.IsBedrock(num)

@@ -1650,7 +1650,7 @@ func marshalReceipt(receipt *types.Receipt, blockHash common.Hash, blockNumber u
 		if receipt.OperatorFeeConstant != nil {
 			fields["operatorFeeConstant"] = hexutil.Uint64(*receipt.OperatorFeeConstant)
 		}
-		// Fields added in Jovian
+		// Fields added for configurable calldata gas cost feature
 		if receipt.CalldataGasPerCompressedByte != nil {
 			fields["calldataGasPerCompressedByte"] = hexutil.Uint64(*receipt.CalldataGasPerCompressedByte)
 		}

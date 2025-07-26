@@ -94,7 +94,7 @@ type Receipt struct {
 	L1BlobBaseFeeScalar *uint64    `json:"l1BlobBaseFeeScalar,omitempty"` // Always nil prior to the Ecotone hardfork
 	OperatorFeeScalar             *uint64 `json:"operatorFeeScalar,omitempty"`             // Always nil prior to the Isthmus hardfork
 	OperatorFeeConstant           *uint64 `json:"operatorFeeConstant,omitempty"`           // Always nil prior to the Isthmus hardfork
-	CalldataGasPerCompressedByte  *uint64 `json:"calldataGasPerCompressedByte,omitempty"`  // Always nil prior to the Jovian hardfork
+	CalldataGasPerCompressedByte  *uint64 `json:"calldataGasPerCompressedByte,omitempty"`  // Always nil prior to configurable calldata gas cost feature
 }
 
 type receiptMarshaling struct {

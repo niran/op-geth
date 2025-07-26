@@ -99,7 +99,7 @@ var (
 	MinTransactionSizeScaled = new(big.Int).Mul(MinTransactionSize, big.NewInt(1e6))
 
 	// DefaultCalldataGasPerCompressedByte is the default gas cost per compressed byte of calldata
-	// used when Jovian fork is active but no custom parameter is configured
+	// used when configurable calldata gas cost feature is active but no custom parameter is configured
 	DefaultCalldataGasPerCompressedByte = uint32(120)
 
 	emptyScalars = make([]byte, 8)
@@ -266,8 +266,8 @@ func NewFloorDataGasFunc(config *params.ChainConfig, statedb StateGetter) FloorD
 	var cachedFunc func([]byte) (uint64, error)
 
 	selectFunc := func(blockTime uint64) func([]byte) (uint64, error) {
-		if !config.IsOptimismJovian(blockTime) {
-			// Before Jovian, use standard EIP-7623 logic
+		if !config.IsConfigurableCalldataGasCostEnabled(blockTime) {
+			// Before configurable calldata gas cost feature, use standard EIP-7623 logic
 			return floorDataGas
 		}
 		calldataGasCostParams := statedb.GetState(L1BlockAddr, CalldataGasCostParamsSlot)
@@ -459,7 +459,7 @@ type gasParams struct {
 	l1BlobBaseFeeScalar           *uint32    // post-ecotone
 	operatorFeeScalar             *uint32    // post-Isthmus
 	operatorFeeConstant           *uint64    // post-Isthmus
-	calldataGasPerCompressedByte  *uint32    // post-Jovian
+	calldataGasPerCompressedByte  *uint32    // configurable calldata gas cost feature
 }
 
 // intToScaledFloat returns scalar/10e6 as a float
@@ -603,12 +603,12 @@ func extractL1GasParamsPostIsthmus(data []byte) (gasParams, error) {
 }
 
 // extractL1GasParamsPostJovian extracts the gas parameters necessary to compute gas from L1 attribute
-// info calldata after the Jovian upgrade, but not for the very first Jovian block.
+// info calldata after the configurable calldata gas cost feature is enabled, but not for the very first block with the feature.
 func extractL1GasParamsPostJovian(data []byte) (gasParams, error) {
 	if len(data) != 180 {
 		return gasParams{}, fmt.Errorf("expected 180 L1 info bytes, got %d", len(data))
 	}
-	// data layout assumed for Jovian:
+	// data layout assumed for configurable calldata gas cost feature:
 	// offset type varname
 	// 0     <selector>
 	// 4     uint32 _basefeeScalar
