@@ -438,7 +438,12 @@ func (api *ConsensusAPI) forkchoiceUpdated(update engine.ForkchoiceStateV1, payl
 			if payloadAttributes.GasLimit == nil {
 				return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(errors.New("gasLimit parameter is required"))
 			}
-			if api.eth.BlockChain().Config().IsHolocene(payloadAttributes.Timestamp) {
+			if api.eth.BlockChain().Config().IsConfigurableMinBaseFee(payloadAttributes.Timestamp) {
+				if err := eip1559.ValidateHolocene1559Params(payloadAttributes.EIP1559Params); err != nil {
+					return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(err)
+				}
+				eip1559Params = bytes.Clone(payloadAttributes.EIP1559Params)
+			} else if api.eth.BlockChain().Config().IsHolocene(payloadAttributes.Timestamp) {
 				if err := eip1559.ValidateHolocene1559Params(payloadAttributes.EIP1559Params); err != nil {
 					return engine.STATUS_INVALID, engine.InvalidPayloadAttributes.With(err)
 				}
@@ -872,7 +877,7 @@ func (api *ConsensusAPI) newPayload(params engine.ExecutableData, versionedHashe
 	// check whether we already have the block locally.
 
 	// OP-Stack diff: payload must have empty extraData before Holocene and hold eip-1559 params after Holocene.
-	if cfg := api.eth.BlockChain().Config(); cfg.IsConfigurableMinBaseFeeEnabled(params.Timestamp) {
+	if cfg := api.eth.BlockChain().Config(); cfg.IsConfigurableMinBaseFee(params.Timestamp) {
 		if err := eip1559.ValidateMinBaseFeeExtraData(params.ExtraData); err != nil {
 			return api.invalid(err, nil), nil
 		}
