@@ -156,6 +156,7 @@ var (
 		utils.GpoPercentileFlag,
 		utils.GpoMaxGasPriceFlag,
 		utils.GpoIgnoreGasPriceFlag,
+		utils.GpoMinSuggestedPriorityFeeFlag, // deprecated
 		utils.RollupSequencerHTTPFlag,
 		utils.RollupSequencerTxConditionalEnabledFlag,
 		utils.RollupSequencerTxConditionalCostRateLimitFlag,

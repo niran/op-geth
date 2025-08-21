@@ -50,6 +50,7 @@ var DeprecatedFlags = []cli.Flag{
 	MinerNewPayloadTimeoutFlag,
 	MinerEtherbaseFlag,
 	MiningEnabledFlag,
+	GpoMinSuggestedPriorityFeeFlag,
 }
 
 var (
@@ -146,6 +147,11 @@ var (
 	MiningEnabledFlag = &cli.BoolFlag{
 		Name:     "mine",
 		Usage:    "Enable mining (deprecated)",
+		Category: flags.DeprecatedCategory,
+	}
+	GpoMinSuggestedPriorityFeeFlag = &cli.Int64Flag{
+		Name:     "gpo.minsuggestedpriorityfee",
+		Usage:    "Minimum transaction priority fee to suggest (deprecated)",
 		Category: flags.DeprecatedCategory,
 	}
 	MetricsEnabledExpensiveFlag = &cli.BoolFlag{

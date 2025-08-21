@@ -1611,6 +1611,9 @@ func setGPO(ctx *cli.Context, cfg *gasprice.Config) {
 	if ctx.IsSet(GpoIgnoreGasPriceFlag.Name) {
 		cfg.IgnorePrice = big.NewInt(ctx.Int64(GpoIgnoreGasPriceFlag.Name))
 	}
+	if ctx.IsSet(GpoMinSuggestedPriorityFeeFlag.Name) {
+		log.Warn("The flag --gpo.minsuggestedpriorityfee is deprecated and will be removed")
+	}
 }
 
 func setTxPool(ctx *cli.Context, cfg *legacypool.Config) {
